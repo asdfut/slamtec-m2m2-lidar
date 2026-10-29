@@ -1,0 +1,65 @@
+diff --git a/src/imu_driver.cpp b/src/imu_driver.cpp
+index c829e83..c9aa047 100644
+--- a/src/imu_driver.cpp
++++ b/src/imu_driver.cpp
+@@ -54,11 +54,11 @@ int main(int argc, char **argv)
+     LogBridge log_bridge("opensw", node);
+ 
+     // parameters
+-    std::string host = params.param("host", std::string("192.168.11.11"), "Host to connect to");
+-    int port = params.param("port", 1445, "TCP port to connect to");
+-    std::string frame_id = params.param("frame_id", std::string("imu"), "Frame to use for the published messages");
+-    bool use_raw_data = params.param("use_raw_data", true, "Use raw data fields");
+-    float rate = params.param("rate", 50.0, "Publish rate");
++    std::string host = params.param("host", std::string("192.168.11.11"), "Host to connect to").declare().value();
++    int port = params.param("port", 1445, "TCP port to connect to").declare().value();
++    std::string frame_id = params.param("frame_id", std::string("imu"), "Frame to use for the published messages").declare().value();
++    bool use_raw_data = params.param("use_raw_data", true, "Use raw data fields").declare().value();
++    float rate = params.param("rate", 50.0, "Publish rate").declare().value();
+ 
+     auto imu_pub = node->create_publisher<sensor_msgs::msg::Imu>("imu", rclcpp::SensorDataQoS());
+ 
+diff --git a/src/laser_driver.cpp b/src/laser_driver.cpp
+index 0691081..45031ae 100644
+--- a/src/laser_driver.cpp
++++ b/src/laser_driver.cpp
+@@ -53,15 +53,15 @@ int main(int argc, char **argv)
+     LogBridge log_bridge("opensw", node);
+ 
+     // parameters
+-    std::string host = params.param("host", std::string("192.168.11.11"), "Host to connect to");
+-    int port = params.param("port", 1445, "TCP port to connect to");
+-    std::string frame_id = params.param("frame_id", std::string("imu"), "Frame to use for the published messages");
+-    float rate = params.param("rate", 50.0, "Publish rate");
++    std::string host = params.param("host", std::string("192.168.11.11"), "Host to connect to").declare().value();
++    int port = params.param("port", 1445, "TCP port to connect to").declare().value();
++    std::string frame_id = params.param("frame_id", std::string("imu"), "Frame to use for the published messages").declare().value();
++    float rate = params.param("rate", 50.0, "Publish rate").declare().value();
+ 
+     // dynamic parameters
+     double min_range, max_range;
+-    params.register_param(&min_range, "min_range", 0.0, "Min sensor range in meters", 0.0, 10.0);
+-    params.register_param(&max_range, "max_range", 40.0, "Max sensor range in meters", 1.0, 100.0);
++    params.param(&min_range, "min_range", 0.0, "Min sensor range in meters").min(0.0).max(10.0).dynamic().declare();
++    params.param(&max_range, "max_range", 40.0, "Max sensor range in meters").min(1.0).max(100.0).dynamic().declare();
+ 
+     auto scan_pub = node->create_publisher<sensor_msgs::msg::LaserScan>("scan", rclcpp::SensorDataQoS());
+ 
+diff --git a/src/logger.cpp b/src/logger.cpp
+index 96ecbb9..18cd4e3 100644
+--- a/src/logger.cpp
++++ b/src/logger.cpp
+@@ -52,7 +52,12 @@ class RosLogSink : public spdlog::sinks::base_sink <Mutex>
+     protected:
+     void sink_it_(const spdlog::details::log_msg& msg) override
+     {
+-        static rcutils_log_location_t __log_loc = { msg.source.funcname, msg.source.filename, static_cast<size_t>(msg.source.line) };
++        // spdlog leaves funcname/filename null when no source location is recorded, and the
++        // rosout handler calls strlen() on them, so fall back to empty strings.
++        rcutils_log_location_t __log_loc = {
++            msg.source.funcname ? msg.source.funcname : "",
++            msg.source.filename ? msg.source.filename : "",
++            static_cast<size_t>(msg.source.line) };
+         if (msg.level == spdlog::level::info) {
+             rcutils_log(&__log_loc, RCUTILS_LOG_SEVERITY_INFO, logger_.get_name(), "%s", fmt::to_string(msg.payload).c_str());
+         }

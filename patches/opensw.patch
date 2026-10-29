@@ -1,0 +1,61 @@
+diff --git a/include/opensw/client.h b/include/opensw/client.h
+index 1fde59e..1469dc4 100644
+--- a/include/opensw/client.h
++++ b/include/opensw/client.h
+@@ -202,7 +202,7 @@ class Client {
+     const size_t max_buffer_size_ = 10000000;
+     asio::io_context io_context_;
+     asio::io_context::work work_;
+-    asio::deadline_timer deadline_;
++    asio::steady_timer deadline_;
+     asio::ip::tcp::socket socket_;
+     asio::streambuf stream_buffer_;
+     std::mt19937 rng_;
+diff --git a/src/client.cpp b/src/client.cpp
+index f9e9022..14801d3 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -34,8 +34,6 @@
+ #include <chrono>
+ #include <iostream>
+ 
+-#include <boost/bind.hpp>
+-#include <boost/date_time/posix_time/posix_time_types.hpp>
+ 
+ #include <opensw/base64.h>
+ #include <opensw/logger.h>
+@@ -70,9 +68,10 @@ bool Client::connect(const std::string& host, int port, int timeout_ms) {
+ 
+         info("Connecting to [{}:{}] ...", host, port);
+ 
+-        asio::async_connect(socket_, endpoints, boost::bind(&Client::handleConnect, this, asio::placeholders::error));
++        asio::async_connect(socket_, endpoints,
++            [this](const std::error_code& err, const asio::ip::tcp::endpoint&){ handleConnect(err); });
+ 
+-        deadline_.expires_from_now(boost::posix_time::milliseconds(timeout_ms_));
++        deadline_.expires_after(std::chrono::milliseconds(timeout_ms_));
+         deadline_.async_wait([&](const std::error_code& err){ checkDeadline(err); });
+         do io_context_.run_one(); while (!connection_failed_ && !socket_.is_open());
+     }
+@@ -436,7 +435,7 @@ std::optional<std::string> Client::sendAndReceive(const std::string& msg) {
+         }
+     });
+ 
+-    deadline_.expires_from_now(boost::posix_time::milliseconds(timeout_ms_));
++    deadline_.expires_after(std::chrono::milliseconds(timeout_ms_));
+     deadline_.async_wait([&](const std::error_code& err){ checkDeadline(err); });
+     do io_context_.run_one(); while (result == asio::error::would_block);
+ 
+@@ -448,10 +447,10 @@ std::optional<std::string> Client::sendAndReceive(const std::string& msg) {
+ }
+ 
+ void Client::checkDeadline(const std::error_code& err) {
+-    if (deadline_.expires_at() <= asio::deadline_timer::traits_type::now()) {
++    if (deadline_.expiry() <= asio::steady_timer::clock_type::now()) {
+         error("Socket timed out");
+         disconnect();
+-        deadline_.expires_at(boost::posix_time::pos_infin);
++        deadline_.expires_at(asio::steady_timer::time_point::max());
+     }
+ }
+ 

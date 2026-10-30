@@ -30,8 +30,11 @@ for p in opensw opensw_ros; do
     fi
 done
 
+# ROS setup scripts reference unset variables, so relax -u while sourcing.
+set +u
 # shellcheck disable=SC1091
 source /opt/ros/jazzy/setup.bash
+set -u
 cd "$WS"
 # Limit parallelism: a full-speed build runs out of memory on a 7-8 GB machine.
 MAKEFLAGS=-j2 colcon build --executor sequential --cmake-args -DCMAKE_BUILD_TYPE=Release

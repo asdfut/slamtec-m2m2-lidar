@@ -20,6 +20,7 @@
 | [docs/zh/protocol.md](docs/zh/protocol.md) | M2M2（Slamware）通訊協定、地圖格式與網頁 API 筆記 |
 | [docs/zh/troubleshooting.md](docs/zh/troubleshooting.md) | 問題排解：斷電重開、連不上、編譯失敗、Segmentation fault |
 | [conversation.md](conversation.md) | 測試過程紀錄（摘要） |
+| [jetson.md](jetson.md) | Jetson（aarch64）上的接線、編譯與測試紀錄 |
 
 ## 檔案說明
 - `setup_workspace.sh`：建立 `~/m2m2_ws`，下載上游驅動（固定版本）、套用修正並編譯
@@ -71,7 +72,7 @@ cd slamtec-m2m2-lidar
 ```bash
 # 1. 雷射驅動 → /scan（frame: laser）
 source ~/m2m2_ws/install/setup.bash
-ros2 run opensw_ros laser_driver --ros-args -p host:=192.168.11.1 -p frame_id:=laser -p rate:=10
+ros2 run opensw_ros laser_driver --ros-args -p host:=192.168.11.1 -p frame_id:=laser -p rate:=10.0
 
 # 2. 內建 SLAM 橋接 → /map、/m2m2/pose、TF map → laser
 source /opt/ros/jazzy/setup.bash

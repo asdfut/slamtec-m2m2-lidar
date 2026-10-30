@@ -20,6 +20,7 @@ Results:
 | [docs/en/protocol.md](docs/en/protocol.md) | Notes on the M2M2 (Slamware) protocol, map format and web API |
 | [docs/en/troubleshooting.md](docs/en/troubleshooting.md) | Troubleshooting: brown-out reboots, no connection, build failures, segmentation fault |
 | [conversation.en.md](conversation.en.md) | Summary of the test session |
+| [jetson.en.md](jetson.en.md) | Wiring, build and test log on a Jetson (aarch64) |
 
 ## Files
 - `setup_workspace.sh`: creates `~/m2m2_ws`, clones the upstream drivers at pinned commits, applies the patches and builds
@@ -71,7 +72,7 @@ Run `export ROS_DOMAIN_ID=99` in all three terminals first.
 ```bash
 # 1. Laser driver → /scan (frame: laser)
 source ~/m2m2_ws/install/setup.bash
-ros2 run opensw_ros laser_driver --ros-args -p host:=192.168.11.1 -p frame_id:=laser -p rate:=10
+ros2 run opensw_ros laser_driver --ros-args -p host:=192.168.11.1 -p frame_id:=laser -p rate:=10.0
 
 # 2. On-board SLAM bridge → /map, /m2m2/pose, TF map → laser
 source /opt/ros/jazzy/setup.bash

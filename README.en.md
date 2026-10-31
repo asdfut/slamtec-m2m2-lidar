@@ -31,6 +31,8 @@ Results:
 - `scripts/scan_check.py`: listens to `/scan` for 6 s and reports rate, point count, distances and the nearest obstacle per sector
 - `scripts/render_map.py`: saves the current map, scan and pose as a PNG
 - `rviz/m2m2.rviz`: RViz2 config (map, scan, pose, TF)
+- `launch/tb3_m2m2.launch.py`: launch file for TurtleBot3 (OpenCR) + M2M2
+- `rviz/tb3_m2m2.rviz`: RViz2 config for the combined setup (adds the robot model)
 - `images/m2m2_map.png`: the map from the test
 
 ## Hardware and wiring
@@ -86,6 +88,24 @@ rviz2 -d rviz/m2m2.rviz
 - `rate` defaults to 50, but the M2M2 only turns about 10 times a second; use 10 to avoid publishing repeated scans
 - Carry the M2M2 around slowly and the map in RViz2 grows as you go
 - If the M2M2 loses power and reboots, `laser_driver` exits on `Broken pipe`; restart it once port 1445 is back ([troubleshooting](docs/en/troubleshooting.md#laser_driver-dies-after-the-m2m2-reboots))
+
+## With a TurtleBot3 (OpenCR)
+Use the M2M2 as the LiDAR on a TurtleBot3 Burger. Install the TurtleBot3 packages and add yourself to the `dialout` group (takes effect after logging in again):
+```bash
+sudo apt install ros-jazzy-turtlebot3 ros-jazzy-turtlebot3-msgs ros-jazzy-dynamixel-sdk ros-jazzy-turtlebot3-teleop
+sudo usermod -aG dialout $USER
+```
+Launch:
+```bash
+export ROS_DOMAIN_ID=99
+source ~/m2m2_ws/install/setup.bash
+ros2 launch launch/tb3_m2m2.launch.py rviz:=true
+```
+- Starts `robot_state_publisher`, `turtlebot3_node` (OpenCR), `laser_driver` and the SLAM bridge; the stock TurtleBot3 LDS driver is not started
+- TF: `map → (M2M2 SLAM) → odom → (wheel odometry) → base_footprint → … → base_scan → laser`. The bridge runs with `odom_frame:=odom` and publishes the M2M2 pose as `map → odom`
+- Set the M2M2 mounting pose with `laser_x`, `laser_y`, `laser_z`, `laser_yaw` (relative to `base_scan`); if it is mounted backwards, add `laser_yaw:=3.1416`
+- `laser_driver` respawns 5 s after it dies on a disconnect
+- Keyboard teleop: `TURTLEBOT3_MODEL=burger ros2 run turtlebot3_teleop teleop_keyboard`
 
 ## Test results
 Measured with `scripts/scan_check.py` (M2M2 sitting on a desk):

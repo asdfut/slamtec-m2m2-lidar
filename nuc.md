@@ -40,3 +40,23 @@
 - M2M2 斷電重開時，`laser_driver` 會一直 `Socket timed out` 重試，最後丟出 `std::system_error: write: Broken pipe` 直接結束（exit code 250），不會自己恢復
 - `m2m2_slam_bridge.py` 會自己重連，不受影響
 - 暫時解法：等 1445 重新打開（開機後約 35 秒）再重開 `laser_driver`。M2M2 重開機後內建 SLAM 地圖會清空
+- `launch/tb3_m2m2.launch.py` 裡的 `laser_driver` 設成 `respawn`，斷線當掉後會自動重啟
+
+## 8. OpenCR（TurtleBot3 Burger 韌體）
+- Dynamixel Protocol 2.0、1 Mbps ping ID 200 有回應：型號編號 20480（0x5000），韌體版本 5，電壓 12.26 V（接 DC 變壓器）
+- 還沒重新登入時，可以用 `sg dialout -c ...` 取得 `/dev/ttyACM0` 權限。`sg` 會清掉 `LD_LIBRARY_PATH`，要在 `sg` 裡面再 `source /opt/ros/jazzy/setup.bash`
+- 不經過 launch 檔直接 `ros2 run turtlebot3_node turtlebot3_ros` 時，`turtlebot3_node` 和 `diff_drive_controller` 都要有 `namespace` 參數，不然會 `Statically typed parameter 'namespace' must be initialized`
+- Jazzy 的 `burger.yaml` 預設 `enable_stamped_cmd_vel: true`，`/cmd_vel` 是 `TwistStamped`
+- 馬達測試（輪子架空）：
+
+| 指令 | 理論值 | 實測（左 / 右） |
+|---|---|---|
+| 前進 0.05 m/s × 2 秒 | 各 +3.03 rad | +3.06 / +3.03 rad |
+| 旋轉 0.3 rad/s × 2 秒 | −1.45 / +1.45 rad | −1.44 / +1.46 rad |
+
+## 9. 整合 TurtleBot3 + M2M2
+- `launch/tb3_m2m2.launch.py` 一次啟動 OpenCR 節點、`robot_state_publisher`、`laser_driver`、SLAM 橋接、RViz2
+- 橋接新增 `odom_frame` 參數：設成 `odom` 時發布 `map → odom`（= `map → laser` × (`odom → laser`)⁻¹，2D），TF 樹維持一棵樹
+- 驗證（輪子架空，前進＋旋轉後）：odom 認為前進 0.104 m，但 TF `map → laser` 和 `/m2m2/pose` 完全一致（x=+0.255、y=−0.031、yaw=+12.8°），補償正確
+- 測試前後 `/m2m2/pose` 本身移動了約 12 cm，原因還沒確認（可能是車子被碰到或 SLAM 漂移）
+- 還沒做：確認 M2M2 安裝方向（`laser_yaw`），放到地上實際跑

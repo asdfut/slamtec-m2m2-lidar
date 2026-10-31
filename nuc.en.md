@@ -40,3 +40,23 @@ Environment: Intel NUC8i7BEH (x86_64, 7.6 GB RAM), Ubuntu 24.04, ROS 2 Jazzy. Th
 - When the M2M2 loses power and reboots, `laser_driver` retries with `Socket timed out` and then exits on `std::system_error: write: Broken pipe` (exit code 250). It does not recover by itself
 - `m2m2_slam_bridge.py` reconnects on its own
 - Workaround for now: wait for port 1445 to reopen (about 35 s after boot), then restart `laser_driver`. The on-board SLAM map is cleared when the M2M2 reboots
+- In `launch/tb3_m2m2.launch.py`, `laser_driver` is set to respawn, so it comes back by itself
+
+## 8. OpenCR (TurtleBot3 Burger firmware)
+- A DYNAMIXEL Protocol 2.0 ping to ID 200 at 1 Mbps answers: model number 20480 (0x5000), firmware version 5, 12.26 V (on a DC adapter)
+- Before logging in again, `sg dialout -c ...` gives access to `/dev/ttyACM0`. `sg` drops `LD_LIBRARY_PATH`, so source `/opt/ros/jazzy/setup.bash` inside the `sg` shell
+- Running `ros2 run turtlebot3_node turtlebot3_ros` without the launch file needs a `namespace` parameter for both `turtlebot3_node` and `diff_drive_controller`, otherwise it fails with `Statically typed parameter 'namespace' must be initialized`
+- The Jazzy `burger.yaml` sets `enable_stamped_cmd_vel: true`, so `/cmd_vel` is `TwistStamped`
+- Motor test (wheels off the ground):
+
+| Command | Expected | Measured (left / right) |
+|---|---|---|
+| Forward 0.05 m/s × 2 s | +3.03 rad each | +3.06 / +3.03 rad |
+| Rotate 0.3 rad/s × 2 s | −1.45 / +1.45 rad | −1.44 / +1.46 rad |
+
+## 9. TurtleBot3 + M2M2 together
+- `launch/tb3_m2m2.launch.py` starts the OpenCR node, `robot_state_publisher`, `laser_driver`, the SLAM bridge and RViz2
+- The bridge has a new `odom_frame` parameter: set to `odom`, it publishes `map → odom` (= `map → laser` × (`odom → laser`)⁻¹, in 2D) so the TF tree stays a tree
+- Check (wheels off the ground, after driving forward and rotating): odom thinks the robot moved 0.104 m, yet TF `map → laser` matches `/m2m2/pose` exactly (x=+0.255, y=−0.031, yaw=+12.8°), so the compensation works
+- `/m2m2/pose` itself moved about 12 cm between the checks; the cause is not confirmed yet (the robot may have been knocked, or SLAM drift)
+- Still to do: confirm the M2M2 mounting direction (`laser_yaw`) and drive on the floor

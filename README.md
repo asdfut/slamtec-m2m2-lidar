@@ -31,6 +31,8 @@
 - `scripts/scan_check.py`：訂閱 `/scan` 6 秒，統計頻率、點數、距離與各方向最近障礙物
 - `scripts/render_map.py`：把目前的地圖、雷射和位置存成 PNG
 - `rviz/m2m2.rviz`：RViz2 設定（地圖、雷射、位置、TF）
+- `launch/tb3_m2m2.launch.py`：TurtleBot3（OpenCR）＋ M2M2 整合啟動檔
+- `rviz/tb3_m2m2.rviz`：整合用的 RViz2 設定（多了機器人模型）
 - `images/m2m2_map.png`：測試時的地圖
 
 ## 硬體與接線
@@ -86,6 +88,24 @@ rviz2 -d rviz/m2m2.rviz
 - `rate` 預設 50，但 M2M2 一秒只轉約 10 圈，設成 10 才不會發布重複的掃描
 - 拿著 M2M2 慢慢走，RViz2 裡的地圖會跟著展開
 - M2M2 斷電重開後 `laser_driver` 會因 `Broken pipe` 結束，要等 1445 重新打開後手動重開（[問題排解](docs/zh/troubleshooting.md#m2m2-重開後-laser_driver-當掉)）
+
+## 搭配 TurtleBot3（OpenCR）
+把 M2M2 當成 TurtleBot3 Burger 的雷達。先安裝 TurtleBot3 套件，並把使用者加進 `dialout` 群組（重新登入後生效）：
+```bash
+sudo apt install ros-jazzy-turtlebot3 ros-jazzy-turtlebot3-msgs ros-jazzy-dynamixel-sdk ros-jazzy-turtlebot3-teleop
+sudo usermod -aG dialout $USER
+```
+啟動：
+```bash
+export ROS_DOMAIN_ID=99
+source ~/m2m2_ws/install/setup.bash
+ros2 launch launch/tb3_m2m2.launch.py rviz:=true
+```
+- 會一起啟動 `robot_state_publisher`、`turtlebot3_node`（OpenCR）、`laser_driver`、SLAM 橋接，不會啟動 TurtleBot3 預設的 LDS 雷達
+- TF：`map →（M2M2 SLAM）→ odom →（輪子里程計）→ base_footprint → … → base_scan → laser`。橋接用 `odom_frame:=odom` 模式，把 M2M2 的位置換算成 `map → odom` 發布
+- M2M2 的安裝位置用 `laser_x`、`laser_y`、`laser_z`、`laser_yaw`（相對 `base_scan`）調整；裝反了就加 `laser_yaw:=3.1416`
+- `laser_driver` 設成斷線當掉後 5 秒自動重啟
+- 鍵盤控制：`TURTLEBOT3_MODEL=burger ros2 run turtlebot3_teleop teleop_keyboard`
 
 ## 測試結果
 用 `scripts/scan_check.py` 量測（M2M2 放在桌上）：

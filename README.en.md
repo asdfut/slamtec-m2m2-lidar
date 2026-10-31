@@ -8,7 +8,7 @@ Results:
 - The M2M2 scans at about **10.8 Hz**, 853 points per revolution, full 360°, with sensible distances
 - `/scan` comes from the open-source driver [hatchbed/opensw_ros](https://github.com/hatchbed/opensw_ros). It dates from 2022 and needs 3 fixes to build and run on Ubuntu 24.04 + Jazzy ([details](docs/en/driver-patches.md))
 - `m2m2_slam_bridge.py` reads the map and pose from the M2M2's **on-board SLAM** and publishes them as `/map`, `/m2m2/pose` and TF `map → laser`, so the mapping result shows up in RViz2
-- **Mind the power supply**: the M2M2 runs on 5 V and draws up to about 1.3 A. Powered from the OpenCR 5 V output it kept browning out and rebooting; a 5 V 2 A USB charger fixed it
+- **Mind the power supply**: the M2M2 runs on 5 V and draws up to about 1.3 A. The OpenCR 5 V output can supply it, but **the power plug must be fully seated and secured**: a loose contact makes it keep rebooting (corrected 2026-10-31, see [nuc.en.md](nuc.en.md))
 
 ![Map built by the M2M2 on-board SLAM (white = free, black = obstacle, grey = unknown)](images/m2m2_map.png)
 
@@ -21,6 +21,7 @@ Results:
 | [docs/en/troubleshooting.md](docs/en/troubleshooting.md) | Troubleshooting: brown-out reboots, no connection, build failures, segmentation fault |
 | [conversation.en.md](conversation.en.md) | Summary of the test session |
 | [jetson.en.md](jetson.en.md) | Wiring, build and test log on a Jetson (aarch64) |
+| [nuc.en.md](nuc.en.md) | Test log on an Intel NUC: corrected power findings, driver dying after a disconnect |
 
 ## Files
 - `setup_workspace.sh`: creates `~/m2m2_ws`, clones the upstream drivers at pinned commits, applies the patches and builds
@@ -42,13 +43,13 @@ Results:
 | Ports | 1445 (Slamware SDK), 80 (web management page), 22 (SSH) |
 
 ```
-USB charger 5V 2A ──► M2M2 adapter board ◄── Ethernet ──► laptop Ethernet port (192.168.11.100)
+OpenCR 5V output (or a 5V 2A+ USB charger) ──► M2M2 adapter board ◄── Ethernet ──► laptop Ethernet port (192.168.11.x)
 ```
 
-> ⚠️ Do not power the M2M2 from the OpenCR DC5V output. In testing it rebooted every time, a few seconds after the SLAM service started and the laser head spun up to full speed. See [troubleshooting](docs/en/troubleshooting.md#m2m2-keeps-dropping-off-the-network).
+> ⚠️ **Seat the M2M2 power plug firmly and secure it** (hot glue, a cable tie, etc.). A loose plug makes it lose power and reboot during startup or when carried around. At first this looked like the OpenCR 5 V output running out of current; on 2026-10-31, with the plug pressed home, it ran on OpenCR 5 V for about 18 minutes. See [troubleshooting](docs/en/troubleshooting.md#m2m2-keeps-dropping-off-the-network).
 
 ## Laptop network setup
-Create a static-IP wired connection with NetworkManager:
+The M2M2 runs a DHCP server on its Ethernet port and usually hands out `192.168.11.200`, so nothing needs configuring. If you don't get an address, create a static-IP wired connection with NetworkManager:
 ```bash
 nmcli con add type ethernet ifname enp3s0 con-name mapper \
   ipv4.method manual ipv4.addresses 192.168.11.100/24 ipv6.method link-local
@@ -59,12 +60,12 @@ Replace `enp3s0` with your wired interface name (`ip -br link`).
 
 ## Install and build
 ```bash
-sudo apt install libasio-dev
+sudo apt install libasio-dev nlohmann-json3-dev
 git clone https://github.com/asdfut/slamtec-m2m2-lidar.git
 cd slamtec-m2m2-lidar
 ./setup_workspace.sh          # builds in ~/m2m2_ws, about 3–5 minutes
 ```
-The other dependencies (`libeigen3-dev`, `libspdlog-dev`, `libopencv-dev`, `nlohmann-json3-dev`, `libassimp-dev`) usually come with a Jazzy desktop install.
+The other dependencies (`libeigen3-dev`, `libspdlog-dev`, `libopencv-dev`, `libassimp-dev`) usually come with a Jazzy desktop install. `nlohmann-json3-dev` was missing on both the NUC and the Jetson.
 
 ## Launch
 Run `export ROS_DOMAIN_ID=99` in all three terminals first.
@@ -84,6 +85,7 @@ rviz2 -d rviz/m2m2.rviz
 - `laser_driver` defaults `frame_id` to `imu`; set it to `laser`
 - `rate` defaults to 50, but the M2M2 only turns about 10 times a second; use 10 to avoid publishing repeated scans
 - Carry the M2M2 around slowly and the map in RViz2 grows as you go
+- If the M2M2 loses power and reboots, `laser_driver` exits on `Broken pipe`; restart it once port 1445 is back ([troubleshooting](docs/en/troubleshooting.md#laser_driver-dies-after-the-m2m2-reboots))
 
 ## Test results
 Measured with `scripts/scan_check.py` (M2M2 sitting on a desk):
@@ -95,7 +97,7 @@ Measured with `scripts/scan_check.py` (M2M2 sitting on a desk):
 | Angle range | −179.7° to +179.9° |
 | Valid points | 554 (65%) |
 | Distance | 0.24 to 5.58 m, median 1.18 m |
-| Network stability | no drops for 2+ minutes once powered from a USB charger |
+| Network stability | no drops for 2+ minutes with the plug pressed home (about 18 minutes on OpenCR 5 V on the NUC) |
 | On-board SLAM map | about 4 × 7.6 m, 0.05 m per cell |
 
 ## License
